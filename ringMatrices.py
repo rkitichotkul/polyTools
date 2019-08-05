@@ -12,7 +12,7 @@ dirData = directory + 'data/'
 dirSave = directory
 
 # Plot energies vs save point
-energies = getEnergies(['bend', 'stretch', 'shear'], dirData, total=True)
+energies = pol.getEnergies(['bend', 'stretch', 'shear'], dirData, total=True)
 plt.plot(energies[:, 0], energies[:, 1], label='bend energy')
 plt.plot(energies[:, 0], energies[:, 2], label='stretch energy')
 plt.plot(energies[:, 0], energies[:, 3], label='shear energy')
@@ -24,7 +24,7 @@ plt.savefig(dirSave + '/energies_' + name + '.png')
 plt.clf()
 
 # Plot radius of gyration vs save point
-Rg = rgVt(savePoints, dirData)
+Rg = pol.rgVt(savePoints, dirData)
 plt.plot(Rg[:, 0], Rg[:, 1])
 plt.xlabel('Save point')
 plt.ylabel('Radius of gyration')
@@ -33,7 +33,7 @@ plt.savefig(dirSave + '/rgVt_' + name + '.png')
 plt.clf()
 
 # Plot area of projection on xy plane
-area = areaRingVt(savePoints, dirData, inteType='trapz')
+area = pol.areaRingVt(savePoints, dirData, inteType='trapz')
 plt.plot(area[:, 0], area[:, 1])
 plt.xlabel('Save point')
 plt.ylabel('Area')
@@ -42,7 +42,7 @@ plt.savefig(dirSave + '/areaRingVt_' + name + '.png')
 plt.clf()
 
 # Plot area of convex hull of projection on xy plane
-area = areaRingCvHVt(savePoints, dirData, inteType='trapz')
+area = pol.areaRingCvHVt(savePoints, dirData, inteType='trapz')
 plt.plot(area[:, 0], area[:, 1])
 plt.xlabel('Save point')
 plt.ylabel('Area')
