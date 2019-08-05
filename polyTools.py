@@ -705,7 +705,7 @@ This function calculates the area of the projection on xy-plane of the ring
 polymer by using Stokes theorem. Note that the area can be negative.
 '''
 # </editor-fold>
-def areaRingCvHVt(savePoints: list, directory: str, intType: str='simps', noNeg: bool=True):
+def areaRingCvHVt(savePoints: list, directory: str, inteType: str='simps', noNeg: bool=True):
     numSavePoints = (savePoints[1] - savePoints[0]) // savePoints[2] + 1
     result = np.empty([numSavePoints, 2])
     for i in range(numSavePoints):
