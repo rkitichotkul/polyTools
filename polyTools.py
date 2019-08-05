@@ -90,6 +90,7 @@ Indices of the columns inside energiesv0 file are as follow:
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.linalg as LA
+import scipy.integrate as inte
 import scipy.signal as sgl
 from scipy.spatial import ConvexHull
 
