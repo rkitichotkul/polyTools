@@ -89,8 +89,99 @@ Indices of the columns inside energiesv0 file are as follow:
 
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.linalg as LA
 import scipy.signal as sgl
 from scipy.spatial import ConvexHull
+
+# ---------- auxiliary functions ----------#
+
+# <editor-fold getNumBeads doc
+''' Number of beads in a chain
+
+Returns
+-------
+N : int
+    The number of beads in a chain
+
+Note
+----
+This code assumes there is only one chain in the simulation.
+'''
+# </editor-fold>
+def getNumBeads(directory: str):
+    fname = directory + 'r0v0'
+    thisR = np.loadtxt(fname)
+    return thisR.shape[0]
+
+# ---------- energy functions ----------#
+# <editor-fold getEnergiesCol
+''' Get energy parameters in energiesv0 at all save points
+
+Parameters
+----------
+columns: list
+    list of numbers corresponding to the columns in energiesv0 file
+
+Returns
+-------
+result: (N, columns.shape[0] + 1) np.ndarary
+    First column: save point index (starting from 0)
+    Other columns: data corresponding to the column number
+
+Note
+----
+See the columns corresponding to each energy at the module documentation
+'''
+# </editor-fold>
+def getEnergiesCol(columns: list, directory: str):
+    data = np.loadtxt(directory + 'energiesv0', skiprows=1)
+    columns = np.append(0, columns)
+    result = np.array([data[:, i] for i in columns])
+    return np.transpose(result)
+
+# <editor-fold getEnergies
+''' Plot energies
+
+Parameters
+----------
+energies: list (str)
+    list of types of energies to plot
+total: bool
+    whether to include the sum of all energies specified in energies variable
+
+Return
+------
+result: (N, number of energies + 1) np.ndarray
+    First column is the save point.
+    Next columns are energies corresponding to the save points.
+    The energies included depend on the energies list; however, the ordering
+    is always bend, stretch, shear, twist
+
+Note
+----
+Energies available for this function are bend, stretch, shear, and twist.
+'''
+# </editor-fold>
+def getEnergies(energies: list, directory: str, total: bool=False):
+    energiesColumn = np.array([], dtype=int)
+    if 'bend' in energies:
+        energiesColumn = np.append(energiesColumn, 17)
+    if 'stretch' in energies:
+        energiesColumn = np.append(energiesColumn, 20)
+    if 'shear' in energies:
+        energiesColumn = np.append(energiesColumn, 23)
+    if 'twist' in energies:
+        energiesColumn = np.append(energiesColumn, 35)
+
+    result = getEnergiesCol(energiesColumn, directory)
+    if total:
+        totalEnergy = np.sum(result[:, 1:], axis=1)
+        result = np.concatenate((result.T, [totalEnergy]), axis=0)
+        result = result.T
+
+    return result
+
+# ---------- end-to-end distance squared functions ----------#
 
 # <editor-fold r2vt doc
 ''' Squared distances of beads n links apart versus save points
@@ -180,6 +271,8 @@ def r2Vn(nRange: list, savePoints: list, directory: str):
         result[i, 0] = i * nRange[2] + nRange[0]
         result[i, 1] = np.mean(r2Atn(i * nRange[2] + nRange[0], savePoints, directory))
     return result
+
+# ---------- relative end-to-end distance functions ----------#
 
 # <editor-fold rLAtn doc
 ''' Distance of beads n links apart relative to maximum length of the chain
@@ -284,6 +377,8 @@ def rLAtnVtHist(result: dict, numBins: int):
     plt.title('End-to-end distance distribution')
     plt.legend()
 
+# ---------- tangent correlator functions ----------#
+
 # <editor-fold uuAtn doc
 ''' Tangent correlator of beads n links apart
 
@@ -343,48 +438,36 @@ def uuVn(nRange: list, savePoints: list, directory: str):
         result[i, 1] = np.mean(uuAtn(i * nRange[2] + nRange[0], savePoints, directory))
     return result
 
-# <editor-fold getNumBeads doc
-''' Number of beads in a chain
+# ---------- radius of gyration functions ----------#
+# <editor-fold rgVt doc
+''' Radius of gyration versus save point
 
 Returns
 -------
-N : int
-    The number of beads in a chain
+result: (N, 2) np.ndarray
+    First column is n, the number of links between beads.
+    Second column is the radius of gyration.
 
 Note
 ----
-This code assumes there is only one chain in the simulation.
+Radius of gyration is calculated as follows:
+Rg = sqrt((1/N) * ||sum(Ri - Rcm)^2||)
+where Rcm = (1/N) * sum(Ri)
 '''
 # </editor-fold>
-def getNumBeads(directory: str):
-    fname = directory + 'r0v0'
-    thisR = np.loadtxt(fname)
-    return thisR.shape[0]
+def rgVt(savePoints: list, directory: str):
+    numBeads = getNumBeads(directory)
+    numSavePoints = (savePoints[1] - savePoints[0]) // savePoints[2] + 1
+    result = np.empty([numSavePoints, 2])
+    for i in range(numSavePoints):
+        result[i, 0] = i * savePoints[2] + savePoints[0]
+        fname = directory + 'r' + str(i * savePoints[2]+ savePoints[0]) + 'v0'
+        thisR = np.loadtxt(fname)
+        thisrCM = np.sum(thisR, axis=0) / numBeads
+        result[i, 1] = np.sqrt(LA.norm(np.sum((thisR - thisrCM) ** 2, axis=0)) / numBeads)
+    return result
 
-# <editor-fold getEnergies
-''' Energies at all save points
-
-Parameters
-----------
-columns: list
-    list of numbers corresponding to the columns in energiesv0 file
-
-Returns
--------
-result: (N, columns.shape[0] + 1) np.ndarary
-    First column: save point index (starting from 0)
-    Other columns: data corresponding to the column number
-
-Note
-----
-See the columns corresponding to each energy at the module documentation
-'''
-# </editor-fold>
-def getEnergies(columns: list, directory: str):
-    data = np.loadtxt(directory + 'energiesv0', skiprows=1)
-    columns = np.append(0, columns)
-    result = np.array([data[:, i] for i in columns])
-    return np.transpose(result)
+# ---------- ring area functions ----------#
 
 # <editor-fold areaRing
 ''' Area of the closed curve formed by a polymer ring
@@ -512,7 +595,7 @@ This function rearranges the simplex pairs into a sequence of points along
 the "outer" curve formed by the convex hull, so that area calculation is possible.
 '''
 # </editor-fold>
-def curveCvH(simplices):
+def curveCvH(simplices: list):
     result = np.array([], dtype=int);
 
     # Add first point
@@ -548,7 +631,7 @@ Note
 This function is the helper of curveCvH.
 '''
 # </editor-fold>
-def nextIndexCvH(simplices, thisIndex):
+def nextIndexCvH(simplices: list, thisIndex: int):
     thisPoint = simplices[thisIndex[0], thisIndex[1]]
     # Search every point in simplices
     for i in range(simplices.shape[0]):
@@ -559,3 +642,77 @@ def nextIndexCvH(simplices, thisIndex):
                 else:
                     jOfNext = 0
                 return np.array([i, jOfNext])
+
+# <editor-fold areaRingVt
+''' Area of the closed curve formed by a polymer ring versus save point
+
+Parameters
+----------
+inteType: str
+    Type of numerical integration used
+    simps means Simpson's rule
+    trapz means Trapezoidal rule
+noNeg: bool
+    If noNeg is true, returns the absolute value of the area.
+
+Returns
+-------
+result: (N, 2) np.ndarray
+    First column is the save point
+    Second column is the corresponding area
+
+Note
+----
+This function calculates the area of the projection on xy-plane of the ring
+polymer by using Stokes theorem. Note that the area can be negative.
+'''
+# </editor-fold>
+def areaRingVt(savePoints: list, directory: str, inteType: str='simps', noNeg: bool=True):
+    numSavePoints = (savePoints[1] - savePoints[0]) // savePoints[2] + 1
+    result = np.empty([numSavePoints, 2])
+    for i in range(numSavePoints):
+        result[i, 0] = i * savePoints[2] + savePoints[0]
+        fname = directory + 'r' + str(i * savePoints[2]+ savePoints[0]) + 'v0'
+        thisR = np.loadtxt(fname)
+        if noNeg:
+            result[i, 1] = abs(areaRing(thisR[:, 0], thisR[:, 1], inteType))
+        else:
+            result[i, 1] = areaRing(thisR[:, 0], thisR[:, 1], inteType)
+    return result
+
+# <editor-fold areaRingCvHVt
+''' Area of the closed curve formed by the convex hull of a polymer ring versus save point
+
+Parameters
+----------
+inteType: str
+    Type of numerical integration used
+    simps means Simpson's rule
+    trapz means Trapezoidal rule
+noNeg: bool
+    If noNeg is true, returns the absolute value of the area.
+
+Returns
+-------
+result: (N, 2) np.ndarray
+    First column is the save point
+    Second column is the corresponding area
+
+Note
+----
+This function calculates the area of the projection on xy-plane of the ring
+polymer by using Stokes theorem. Note that the area can be negative.
+'''
+# </editor-fold>
+def areaRingCvHVt(savePoints: list, directory: str, intType: str='simps', noNeg: bool=True):
+    numSavePoints = (savePoints[1] - savePoints[0]) // savePoints[2] + 1
+    result = np.empty([numSavePoints, 2])
+    for i in range(numSavePoints):
+        result[i, 0] = i * savePoints[2] + savePoints[0]
+        fname = directory + 'r' + str(i * savePoints[2]+ savePoints[0]) + 'v0'
+        thisR = np.loadtxt(fname)
+        if noNeg:
+            result[i, 1] = abs(areaRingCvH(thisR[:, 0], thisR[:, 1], inteType))
+        else:
+            result[i, 1] = areaRingCvH(thisR[:, 0], thisR[:, 1], inteType)
+    return result
