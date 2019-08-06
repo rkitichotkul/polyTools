@@ -114,6 +114,164 @@ def getNumBeads(directory: str):
     thisR = np.loadtxt(fname)
     return thisR.shape[0]
 
+# <editor-fold windowAve
+''' Moving-point average
+
+Parameters
+----------
+signal: (N, 2) list
+    Signal in time domain
+    First column is the time (save point)
+    Second column is the signal
+
+Returns
+-------
+result: (N', 2) np.ndarray
+    The window-averaged signal
+    First column is the save point
+    Second column is the result signal corresponding to the save point
+
+Note
+----
+For an even-size signal, the resulting windowed signal is delayed by half a time step.
+Only valid average values are included in the result. The corresponding time step
+is in the same row of the result array.
+'''
+# </editor-fold>
+def windowAve(signal: list, winSize: int):
+    resultSize = signal.shape[0] - winSize + 1
+    result = np.empty([resultSize, 2])
+    window = np.ones(winSize)
+    if winSize % 2 == 1:
+        # odd window size
+        startIndex = int(signal[0, 0] + np.floor(winSize / 2))
+        endIndex = int(signal[-1, 0] - np.floor(winSize / 2))
+    else:
+        # even window size
+        startIndex = int(signal[0, 0] + winSize / 2)
+        endIndex = int(signal[-1, 0] - winSize / 2 + 1)
+    result[:, 0] = signal[startIndex:endIndex+1, 0]
+    result[:, 1] = sgl.convolve(signal[:, 1], window, mode='valid') * (1/winSize)
+    return result
+
+# <editor-fold autoCorr
+''' Autocorrelation
+
+Parameters
+----------
+signal: (N, 2) list
+    Signal in time domain
+    First column is the time (save point)
+    Second column is the signal
+
+Returns
+-------
+result:
+
+Note
+----
+*** Development note ***
+Need to check why later half of the auto-convolution signal is the
+output autocorrelation.
+There might be other definitions of autocorrelation. This function is modified
+from
+https://stackoverflow.com/questions/643699/how-can-i-use-numpy-correlate-to-do-autocorrelation
+'''
+# </editor-fold>
+def autoCorr(signal: list):
+    result = np.empty(signal.shape)
+    result[:, 0] = signal[:, 0]
+    autoCorrelation = np.correlate(signal[:, 1], signal[:, 1], mode='full')
+    result[:, 1] = autoCorrelation[int(autoCorrelation.shape[0]/2):]
+    return result
+
+# <editor-fold autoCorrCB
+''' Autocorrelation function, at selected delays
+(auto_correlation_vector in the code base)
+
+Parameters
+----------
+signal: (N) list
+    Input signal
+delMin: int
+    Minimum delay (samples)
+delMax: int
+    Maximum delay (samples)
+
+Returns
+-------
+result: (N, 2) np.ndarray
+    First column is delta, the delay in terms of number of samples.
+    Second column is the corresponding autocorrelation.
+
+Note
+----
+In this function, the definition of autocorrelation is
+Rff(delta) = (sum (signal(t) - ave)(signal(t + delta) - ave))/(size * variance)
+'''
+# </editor-fold>
+def autoCorrCB(signal: list, delMin: int, delMax: int):
+    result = np.empty([delMax - delMin + 1, 2])
+    for i in range(delMax - delMin + 1):
+        thisDel = delMin + i
+        thisAuto = autoCorrCB(signal, thisDel)
+        result[i, 0] = thisDel
+        result[i, 1] = thisAuto
+    return result
+
+# <editor-fold autoCorrAtDelCB
+''' Autocorrelation at a single delay
+(auto_correlation in  the code base)
+
+Parameters
+----------
+signal: (N) list
+    Input signal
+delta: int
+    Delay (samples)
+
+Returns
+-------
+result: float
+    Autocorrelation at the specified delay
+
+Note
+----
+This is a helper of autoCorrCB.
+In this function, the definition of autocorrelation is
+Rff(delta) = (sum (signal(t) - ave)(signal(t + delta) - ave))/(size * variance)
+'''
+# </editor-fold>
+def autoCorrAtDelCB(signal: list, delta: int):
+    ave = np.average(signal)
+    var = np.var(signal)
+    flucPdt = np.empty([signal.shape[0] - delta])
+    for i in range(flucPdt.shape[0]):
+        flucPdt[i] = (signal[i] - ave) * (signal[i + delta] - ave)
+    return np.sum(flucPdt) / ((signal.shape[0] - delta) * var)
+
+# under development
+def autoCorrCBVt(savePoints: list, duration: int, signal: list, delMin: int, delMax: int):
+    numDurations = (savePoints[1] - savePoints[0]) // duration
+
+    durOut = np.array([[]])
+    result = np.array([[]])
+    for i in range(numDurations):
+        rLAtThisDur = rLAtn(n, (i * duration + savePoints[0], (i + 1) * duration + savePoints[0], savePoints[2]), l0, directory)
+        rLAtThisDur = np.array([rLAtThisDur])
+        # Keep track of the duration of each rLAtn distribution
+        thisDur = np.array([i * duration + savePoints[0], (i + 1) * duration + savePoints[0]])
+        thisDur = np.array([thisDur])
+
+        if i == 0:
+            result = np.array(rLAtThisDur)
+            durOut = np.array(thisDur)
+        else:
+            result = np.append(result, rLAtThisDur, axis=0)
+            durOut = np.append(durOut, thisDur, axis=0)
+
+    return {'durations' : durOut, 'result' : result}
+
 # ---------- energy functions ----------#
 # <editor-fold getEnergiesCol
 ''' Get energy parameters in energiesv0 at all save points
@@ -499,7 +657,7 @@ where the right-hand side is the line integral of x with respect to y along the 
 Note that the area can be negative.
 '''
 # </editor-fold>
-def areaRing(x: list, y: list, inteType: str='simps'):
+def areaRing(x: list, y: list, inteType: str='trapz'):
     # Need to iterate back to the first point
     x_append = np.append(x, x[0])
     y_append = np.append(y, y[0])
@@ -536,7 +694,7 @@ xy plane. Then, calculate the area formed by that convex hull using areaRing
 function.
 '''
 # </editor-fold>
-def areaRingCvH(x: list, y: list, inteType: str='simps'):
+def areaRingCvH(x: list, y: list, inteType: str='trapz'):
     xHull, yHull = positionCvH(x, y)
     return areaRing(xHull, yHull, inteType)
 
@@ -668,7 +826,7 @@ This function calculates the area of the projection on xy-plane of the ring
 polymer by using Stokes theorem. Note that the area can be negative.
 '''
 # </editor-fold>
-def areaRingVt(savePoints: list, directory: str, inteType: str='simps', noNeg: bool=True):
+def areaRingVt(savePoints: list, directory: str, inteType: str='trapz', noNeg: bool=True):
     numSavePoints = (savePoints[1] - savePoints[0]) // savePoints[2] + 1
     result = np.empty([numSavePoints, 2])
     for i in range(numSavePoints):
@@ -705,7 +863,7 @@ This function calculates the area of the projection on xy-plane of the ring
 polymer by using Stokes theorem. Note that the area can be negative.
 '''
 # </editor-fold>
-def areaRingCvHVt(savePoints: list, directory: str, inteType: str='simps', noNeg: bool=True):
+def areaRingCvHVt(savePoints: list, directory: str, inteType: str='trapz', noNeg: bool=True):
     numSavePoints = (savePoints[1] - savePoints[0]) // savePoints[2] + 1
     result = np.empty([numSavePoints, 2])
     for i in range(numSavePoints):
