@@ -206,11 +206,14 @@ result: (N, 2) np.ndarray
 
 Note
 ----
+This is a helper function of autoCorrCBVt
 In this function, the definition of autocorrelation is
 Rff(delta) = (sum (signal(t) - ave)(signal(t + delta) - ave))/(size * variance)
 '''
 # </editor-fold>
 def autoCorrCB(signal: list, delMin: int, delMax: int):
+    if delMin > delMax :
+        raise ValueError('delMin > delMax')
     result = np.empty([delMax - delMin + 1, 2])
     for i in range(delMax - delMin + 1):
         thisDel = delMin + i
@@ -250,24 +253,52 @@ def autoCorrAtDelCB(signal: list, delta: int):
         flucPdt[i] = (signal[i] - ave) * (signal[i + delta] - ave)
     return np.sum(flucPdt) / ((signal.shape[0] - delta) * var)
 
-# under development
-def autoCorrCBVt(savePoints: list, duration: int, signal: list, delMin: int, delMax: int):
-    numDurations = (savePoints[1] - savePoints[0]) // duration
+# <editor-fold autoCorrCBVt
+''' Autocorrelation at selected delays at selected save points
+Use the autocorrelation defined in the code base
 
+Parameters
+----------
+duration: int
+    Number of save points in an interval
+signal: (N) list
+    Input signal
+delMin: int
+    Minimum delay (samples)
+delMax: int
+    Maximum delay (samples)
+
+Returns
+-------
+result: {'durations' : durOut, 'result' : result} dict
+    Autocorrelation vs delta at different save point intervals
+
+Note
+----
+This function can be used to determine the equilibrium time, as it
+is the autocorrelation defined in the same way as the util/auto_correlation
+in the code base, evaluated at different save points.
+'''
+# </editor-fold>
+def autoCorrCBVt(duration: int, signal: list, delMin: int, delMax: int):
+    if delMax >= duration:
+        raise ValueError('delta exceeds duration')
+    numDurations = signal.shape[0] // duration
     durOut = np.array([[]])
     result = np.array([[]])
     for i in range(numDurations):
-        rLAtThisDur = rLAtn(n, (i * duration + savePoints[0], (i + 1) * duration + savePoints[0], savePoints[2]), l0, directory)
-        rLAtThisDur = np.array([rLAtThisDur])
+        thisSignal = signal[i * duration : (i + 1) * duration]
+        autoCorrThisDur = autoCorrCB(thisSignal[:, 1], delMin, delMax)
+        autoCorrThisDur = np.array([autoCorrThisDur])
         # Keep track of the duration of each rLAtn distribution
-        thisDur = np.array([i * duration + savePoints[0], (i + 1) * duration + savePoints[0]])
+        thisDur = np.array([signal[i * duration, 0]])
         thisDur = np.array([thisDur])
 
         if i == 0:
-            result = np.array(rLAtThisDur)
+            result = np.array(autoCorrThisDur)
             durOut = np.array(thisDur)
         else:
-            result = np.append(result, rLAtThisDur, axis=0)
+            result = np.append(result, autoCorrThisDur, axis=0)
             durOut = np.append(durOut, thisDur, axis=0)
 
     return {'durations' : durOut, 'result' : result}
