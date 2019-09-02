@@ -217,7 +217,7 @@ def autoCorrCB(signal: list, delMin: int, delMax: int):
     result = np.empty([delMax - delMin + 1, 2])
     for i in range(delMax - delMin + 1):
         thisDel = delMin + i
-        thisAuto = autoCorrCBAtDelCB(signal, thisDel)
+        thisAuto = autoCorrAtDelCB(signal, thisDel)
         result[i, 0] = thisDel
         result[i, 1] = thisAuto
     return result
