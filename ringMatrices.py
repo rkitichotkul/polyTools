@@ -37,8 +37,8 @@ plt.clf()
 # Plot histogram of Rg at equilibrium
 RgEq = Rg[eqSavePoint:, 1]
 plt.hist(RgEq, binNum, density=True)
-plt.xlabel('Probability')
-plt.ylabel('Radius of Gyration (nm)')
+plt.xlabel('Radius of Gyration (nm)')
+plt.ylabel('Probability')
 plt.title('Distribution of Rg of ' + name)
 plt.savefig(dirSave + '/rghist' + name + '.png')
 
