@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 directory = '../run1Twist0/'
 name = 'run1Twist0'
 savePoints = [0, 1000, 1]
+eqSavePoint = 400
+binNum = 10
 
 dirData = directory + 'data/'
 dirSave = directory
@@ -31,6 +33,14 @@ plt.ylabel('Radius of gyration')
 plt.title('Radius of gyration vs save point of ' + name)
 plt.savefig(dirSave + '/rgVt_' + name + '.png')
 plt.clf()
+
+# Plot histogram of Rg at equilibrium
+RgEq = Rg[eqSavePoint:, 1]
+plt.hist(RgEq, binNum, density=True)
+plt.xlabel('Probability')
+plt.ylabel('Radius of Gyration (nm)')
+plt.title('Distribution of Rg of ' + name)
+plt.savefig(dirSave + '/rghist' + name + '.png')
 
 # Plot area of projection on xy plane
 area = pol.areaRingVt(savePoints, dirData, inteType='trapz')
